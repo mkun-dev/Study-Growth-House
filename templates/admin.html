@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>后台管理</title>
+    <link rel="stylesheet" href="../static/css/style.css">
+    <link rel="stylesheet" href="../static/css/admin.css">
+    <script src="../static/js/xlsx.full.min.js"></script>
+</head>
+<body>
+    <div id="admin-toast" class="admin-toast" role="status" aria-live="polite"></div>
+
+    <div class="container admin-container">
+        <h1 class="admin-title">宠物屋后台管理系统</h1>
+
+        <div class="main-content-wrapper" id="admin-panel">
+            <div class="admin-class-controls">
+                <div class="admin-class-select">
+                    <label for="admin-class-select">当前班级</label>
+                    <select id="admin-class-select"></select>
+                </div>
+                <div class="admin-class-create">
+                    <label for="admin-new-class-name">创建新班级</label>
+                    <div class="admin-class-create-inline">
+                        <input id="admin-new-class-name" type="text" placeholder="输入班级名称">
+                        <button id="admin-add-class" class="admin-btn admin-primary">创建</button>
+                    </div>
+                </div>
+                <button id="admin-delete-class" class="admin-btn admin-ghost">删除班级</button>
+            </div>
+
+            <h2 id="admin-setup-title">为班级 “<span id="admin-current-class-name">-</span>” 设置名单</h2>
+            <p class="admin-note">可一次性粘贴多个学生姓名，请用换行、空格或逗号分隔。</p>
+            <textarea id="admin-student-input" placeholder="粘贴学生名单..."></textarea>
+            <div class="setup-buttons">
+                <button id="admin-save-students" class="admin-btn admin-primary">保存名字</button>
+                <button id="admin-enter-garden" class="admin-btn admin-secondary">进入宠物屋</button>
+            </div>
+
+            <div class="admin-section">
+                <h3>当前学生名单</h3>
+                <div id="admin-student-tags" class="student-tag-list"></div>
+            </div>
+
+            <div class="admin-section">
+                <h3>小组管理</h3>
+                <div class="admin-section-header">
+                    <input type="text" id="admin-group-input" placeholder="输入新的小组名">
+                    <button id="admin-create-group" class="admin-btn admin-primary">创建小组</button>
+                </div>
+                <div id="admin-groups-display" class="admin-card-grid"></div>
+            </div>
+
+            <div class="admin-section">
+                <h3>爱心商城管理</h3>
+                <div class="admin-section-header">
+                    <input type="text" id="admin-prize-name" placeholder="输入奖品名称">
+                    <input type="number" id="admin-prize-cost" placeholder="所需爱心">
+                    <input type="number" id="admin-prize-stock" placeholder="库存（不填=无限）">
+                    <button id="admin-add-prize" class="admin-btn admin-primary">添加奖品</button>
+                </div>
+                <div id="admin-prizes-display" class="admin-card-grid">
+                    <p class="prize-empty" data-empty>暂无奖品，请添加。</p>
+                </div>
+            </div>
+
+            <div class="admin-section">
+                <h3>宠物成长设置</h3>
+                <div class="admin-growth-form">
+                    <div class="admin-growth-group">
+                        <label for="admin-level2">升级到 LV2 所需爱心</label>
+                        <input type="number" id="admin-level2" min="1" step="1">
+                        <small>建议设置为 4 的倍数</small>
+                    </div>
+                    <div class="admin-growth-group">
+                        <label for="admin-level3">升级到 LV3 所需爱心</label>
+                        <input type="number" id="admin-level3" min="1" step="1">
+                        <small>必须大于 LV2</small>
+                    </div>
+                </div>
+                <button id="admin-save-growth" class="admin-btn admin-primary save-settings-btn">保存成长设置</button>
+            </div>
+
+            <div class="admin-section">
+                <h3>数据管理</h3>
+                <div class="admin-data-buttons">
+                    <button id="admin-import-data" class="admin-btn admin-info">导入数据 (.xlsx)</button>
+                    <button id="admin-export-data" class="admin-btn admin-purple">导出数据 (.xlsx)</button>
+                    <input type="file" id="admin-import-input" accept=".xlsx,.xls" style="display:none;">
+                </div>
+            </div>
+
+                <div class="admin-section danger-zone">
+                    <button id="admin-reset-class" type="button" class="admin-btn admin-danger">本班进度归零</button>
+                </div>
+            </div>
+        </div>
+
+    <div id="admin-group-modal" class="admin-modal" aria-hidden="true">
+        <div class="admin-modal-content" role="dialog" aria-modal="true">
+            <div class="admin-modal-header">
+                <h3 class="admin-modal-title" id="admin-group-modal-title">编辑小组</h3>
+                <button class="icon-btn" id="admin-group-modal-close" aria-label="关闭">×</button>
+            </div>
+            <div class="admin-modal-body">
+                <div id="admin-group-member-list" class="admin-member-list"></div>
+            </div>
+            <div class="admin-modal-actions">
+                <button id="admin-group-modal-cancel" class="cancel-btn" style="background-color:#9e9e9e;">取消</button>
+                <button id="admin-group-modal-save" class="admin-btn admin-primary">保存成员</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="../static/js/admin.js" defer></script>
+</body>
+</html>

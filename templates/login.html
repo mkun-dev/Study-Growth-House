@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>后台登录 - 宠物屋</title>
+    <link rel="stylesheet" href="../static/css/style.css">
+    <style>
+        body { background-color: #f5f9f0; font-family: 'Microsoft YaHei','微软雅黑',Arial,sans-serif; min-height: 100vh; margin: 0; display: flex; align-items: center; justify-content: center; }
+        .login-card {
+            width: min(360px, 90vw);
+            background: #fff;
+            border-radius: 16px;
+            padding: 30px;
+            box-shadow: 0 18px 40px rgba(0,0,0,0.08);
+        }
+        .login-card h1 { text-align: center; color: #f57c00; margin-bottom: 24px; font-size: 1.8rem; }
+        .login-field { margin-bottom: 16px; }
+        .login-field label { display: block; margin-bottom: 6px; font-weight: 600; color: #666; }
+        .login-field input {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #e0e0e0;
+            border-radius: 10px;
+            font-size: 1rem;
+        }
+        .login-btn {
+            width: 100%;
+            margin-top: 10px;
+            border: none;
+            border-radius: 10px;
+            padding: 12px 0;
+            background: #ff9800;
+            color: #fff;
+            font-size: 1rem;
+            cursor: pointer;
+        }
+        .login-btn:active { transform: scale(0.98); }
+        .login-error { color: #d84343; font-size: 0.9rem; min-height: 20px; margin-top: 8px; text-align: center; }
+    </style>
+</head>
+<body>
+    <div class="login-card">
+        <h1>后台登录</h1>
+        <div class="login-field">
+            <label for="admin-username">账号</label>
+            <input type="text" id="admin-username" autocomplete="username" placeholder="请输入账号">
+        </div>
+        <div class="login-field">
+            <label for="admin-password">密码</label>
+            <input type="password" id="admin-password" autocomplete="current-password" placeholder="请输入密码">
+        </div>
+        <button id="admin-login-btn" class="login-btn">登录</button>
+        <div id="login-error" class="login-error"></div>
+    </div>
+
+    <script src="../static/js/login.js" defer></script>
+</body>
+</html>

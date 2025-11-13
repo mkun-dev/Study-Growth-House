@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>宠物屋</title>
+    <!-- 引入 SortableJS 库 -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.0/Sortable.min.js"></script>
+    <!-- 引入 XLSX 库 -->
+    <script src="../static/js/xlsx.full.min.js"></script>
+        <link rel="stylesheet" href="../static/css/style.css">
+
+</head>
+<body>
+    <div class="container">
+        <h1 id="main-title">🐾 宠物屋 🏠</h1>
+        <!-- 班级选择模式 -->
+        <div id="class-mode" class="main-content-wrapper" style="display: none;">
+            <h2>选择班级</h2>
+            <div id="class-card-grid" class="class-card-grid"></div>
+        </div>
+
+        <!-- 设置模式 -->
+        <div id="setup-mode" class="main-content-wrapper" style="display: none;">
+            <h2 id="setup-title">设置学生名单</h2>
+            <textarea id="student-input" placeholder="可一次性粘贴多个学生姓名，请用换行、空格或逗号分隔。"></textarea>
+            <div class="setup-buttons">
+                <button id="save-students-btn">保存名字</button>
+                <button id="enter-garden-btn">进入宠物屋</button>
+            </div>
+            <div class="student-list">
+                <h3>当前学生名单</h3>
+                <div id="existing-students"></div>
+            </div>
+            <div class="group-management">
+                <h3>小组管理</h3>
+                <div class="group-management-header">
+                    <input type="text" id="group-name-input" placeholder="输入新的小组名">
+                    <button id="create-group-btn">创建小组</button>
+                </div>
+                <div id="groups-display-area"></div>
+            </div>
+            <div class="shop-management">
+                <h3>爱心商城管理</h3>
+                <div class="shop-management-header">
+                    <input type="text" id="prize-name-input" placeholder="输入奖品名称">
+                    <input type="number" id="prize-cost-input" placeholder="所需爱心">
+                    <input type="number" id="prize-stock-input" placeholder="库存(不填=无限)">
+                    <button id="add-prize-btn">添加奖品</button>
+                </div>
+                <div id="prize-list-display-area"></div>
+            </div>
+            <div class="pet-growth-settings">
+                <h3>宠物成长设置</h3>
+                <div class="pet-growth-form">
+                    <div class="form-group">
+                        <label for="level2-threshold-input">升级到LV2所需爱心：</label>
+                        <input type="number" id="level2-threshold-input" min="4" value="4" step="4" max="20">
+                        <small style="color: #666; font-size: 0.9rem;">必须是4的倍数</small>
+                    </div>
+                    <div class="form-group">
+                        <label for="level3-threshold-input">升级到LV3所需爱心：</label>
+                        <input type="number" id="level3-threshold-input" min="8" value="8" step="4" max="24">
+                        <small style="color: #666; font-size: 0.9rem;">必须大于LV2且是4的倍数</small>
+                    </div>
+                </div>
+                <button id="save-growth-settings-btn" class="save-settings-btn">保存成长设置</button>
+            </div>
+            <div class="data-management">
+                <h3>数据管理</h3>
+                <div class="data-management-buttons">
+                    <button id="import-data-btn">导入数据 (.xlsx)</button>
+                    <button id="export-data-btn">导出数据 (.xlsx)</button>
+                    <input type="file" id="data-file-input" accept=".xlsx, .xls" style="display: none;">
+                </div>
+            </div>
+            <div class="danger-zone">
+                <button id="reset-all-btn">本班进度归零</button>
+            </div>
+            <!-- 新增：返回班级选择按钮 -->
+            <button id="back-to-class-select-btn">返回班级选择</button>
+        </div>
+        
+        <!-- 游戏模式 (修改) -->
+        <div id="game-mode" style="display: none;">
+            <div class="header-controls">
+                <div class="goal-title-wrapper">
+                    <!-- 新增：当前班级显示 -->
+                    <h2 id="current-class-display"></h2>
+                    <div class="game-header-buttons">
+                        <button id="undo-btn" disabled>撤销操作</button>
+                        <!-- 新增：切换班级按钮 -->
+                        <button id="switch-class-btn">切换班级</button>
+                    </div>
+                </div>
+                <h2>目标</h2> <!-- 将"今日目标"移到这里 -->
+                <textarea id="daily-goal" placeholder="请输入目标..."></textarea>
+                <div id="selection-controls" class="selection-controls">
+                    <button id="toggle-select-mode-btn">多选互动</button>
+                    <button id="select-all-btn" style="display: none;">全选</button>
+                    <button id="water-selected-btn" style="display: none;">批量互动</button>
+                </div>
+            </div>
+            
+            <div class="view-switcher">
+                <button id="show-individual-view-btn" class="active">个人模式</button>
+                <button id="show-group-view-btn">小组模式</button>
+                <button id="show-shop-view-btn">爱心商城</button>
+            </div>
+
+            <div id="individual-view">
+                <div class="garden-area">
+                    <div class="sort-controls">
+                        <label for="individual-sort-select">排序方式：</label>
+                        <select id="individual-sort-select">
+                            <option value="manual">默认排序 (可拖拽)</option>
+                            <option value="score_desc">按分数从高到低</option>
+                            <option value="score_asc">按分数从低到高</option>
+                            <option value="name_asc">按名字排序 (A-Z)</option>
+                        </select>
+                    </div>
+                    <div class="garden-grid" id="garden-grid-individual"></div>
+                </div>
+            </div>
+            
+            <div id="group-view">
+                 <div class="sort-controls">
+                    <label for="group-sort-select">小组排序：</label>
+                    <select id="group-sort-select">
+                        <option value="manual">默认排序</option>
+                        <option value="total_score_desc">按小组总分从高到低</option>
+                        <option value="avg_score_desc">按小组平均互动数从高到低</option>
+                        <option value="name_asc">按小组名字排序 (A-Z)</option>
+                    </select>
+                </div>
+            </div>
+
+            <div id="shop-view">
+                <div class="shop-view-container" id="shop-view-container"></div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 弹窗 (合并自两个文件) -->
+    
+    <!-- 统一弹窗 (来自多班级版) -->
+    <div id="unified-modal" class="modal-overlay">
+        <!-- 创建班级 -->
+        <div class="modal-content" id="create-class-modal-content" style="display:none;">
+            <p>为新班级取个名字吧</p>
+            <input type="text" id="new-class-name-input" placeholder="例如：一班">
+            <div style="margin-top:20px;">
+                <button id="create-class-confirm-btn">创建</button>
+                <button class="cancel-btn">取消</button>
+            </div>
+        </div>
+        <!-- 保存成功 -->
+        <div class="modal-content" id="save-success-modal-content" style="display:none;">
+            <p>已保存！</p>
+            <button id="modal-enter-garden-btn">进入宠物屋</button>
+            <button class="cancel-btn">继续添加</button>
+        </div>
+        <!-- 通用确认 -->
+        <div class="modal-content" id="confirm-modal-content" style="display:none;">
+            <p id="confirm-modal-text">确定要执行此操作吗？</p>
+            <div>
+                <button id="confirm-ok-btn">确定</button>
+                <button class="cancel-btn">取消</button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 其他弹窗-->
+    <div id="rollback-modal" class="modal-overlay"><div class="modal-content"><p>为 <strong id="rollback-student-name"></strong> 退回互动次数</p><input type="number" id="rollback-steps-input" class="modal-input" min="1" value="1"><div style="margin-top: 20px;"><button id="confirm-rollback-btn">确认退回</button><button class="cancel-btn" style="background-color: #9e9e9e;">取消</button></div></div></div>
+    <div id="add-score-modal" class="modal-overlay"><div class="modal-content"><p>为 <strong id="add-score-student-name"></strong> 增加互动次数</p><input type="number" id="add-score-steps-input" class="modal-input" min="1" value="1"><div style="margin-top: 20px;"><button id="confirm-add-score-btn">确认增加</button><button class="cancel-btn" style="background-color: #9e9e9e;">取消</button></div></div></div>
+    <div id="reset-confirm-modal" class="modal-overlay"><div class="modal-content"><p style="color: #c62828; font-weight: bold;">确认归零吗？</p><p id="reset-confirm-text" style="font-size: 1rem;">此操作将清空所有学生的互动记录和宠物徽章，且无法撤销！</p><div style="margin-top: 20px;"><button id="confirm-reset-all-btn" style="background-color: #c62828;">确认归零</button><button class="cancel-btn" style="background-color: #9e9e9e;">取消</button></div></div></div>
+    <div id="group-editor-modal" class="modal-overlay"><div class="modal-content"><h3 id="group-editor-title">编辑小组成员</h3><div id="group-editor-student-list"></div><div><button id="save-group-members-btn">保存更改</button><button class="cancel-btn" style="background-color: #9e9e9e;">取消</button></div></div></div>
+    <div id="delete-group-confirm-modal" class="modal-overlay"><div class="modal-content"><p style="color: #c62828; font-weight: bold;">确认删除小组吗？</p><p id="delete-group-confirm-name" style="font-size: 1.2rem; margin-top:-10px;"></p><p style="font-size: 1rem;">组内成员将变为“待分配”，此操作无法撤销！</p><div style="margin-top: 20px;"><button id="confirm-delete-group-btn" style="background-color: #c62828;">确认删除</button><button class="cancel-btn" style="background-color: #9e9e9e;">取消</button></div></div></div>
+    <div id="penalty-group-confirm-modal" class="modal-overlay"><div class="modal-content"><p style="color: #c62828; font-weight: bold;">确认扣分吗？</p><p id="penalty-group-confirm-name" style="font-size: 1.2rem; margin-top:-10px;"></p><p style="font-size: 1rem;">组内所有成员的进度将各退后1次！</p><div style="margin-top: 20px;"><button id="confirm-penalty-group-btn" style="background-color: #c62828;">确认扣分</button><button class="cancel-btn" style="background-color: #9e9e9e;">取消</button></div></div></div>
+    <div id="import-confirm-modal" class="modal-overlay"><div class="modal-content"><p style="color: #c62828; font-weight: bold;">确认导入数据吗？</p><p id="import-confirm-text" style="font-size: 1rem;">此操作将覆盖当前所有学生和小组数据，确定要继续吗？</p><div style="margin-top: 20px;"><button id="confirm-import-btn" style="background-color: #0288d1;">确认导入</button><button class="cancel-btn" style="background-color: #9e9e9e;">取消</button></div></div></div>
+
+    <!--宠物相关模态框 -->
+
+    <!-- LV3毕业选择模态框 -->
+    <div id="lv3-graduation-modal" class="modal-overlay">
+        <div class="modal-content" style="max-width: 450px;">
+            <div style="text-align: center; margin-bottom: 20px;">
+                <div style="font-size: 3rem; margin-bottom: 15px;">🎉</div>
+            </div>
+            <div id="lv3-graduation-message" style="font-size: 1.3rem; margin-bottom: 20px; text-align: center; color: #f57c00; font-weight: bold;"></div>
+            <div id="lv3-graduation-badge" style="display: flex; justify-content: center; margin: 20px 0;"></div>
+            <div style="margin-top: 25px;">
+                <button id="continue-current-pet-btn" style="background-color: #4caf50; color: white; padding: 12px 25px; margin: 0 8px; border-radius: 8px; font-size: 1rem;">
+                    继续养
+                </button>
+                <button id="change-pet-btn" style="background-color: #ff9800; color: white; padding: 12px 25px; margin: 0 8px; border-radius: 8px; font-size: 1rem;">
+                    换宠物
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 宠物选择模态框 -->
+    <div id="pet-selection-modal" class="modal-overlay">
+        <div class="modal-content" style="max-width: 600px;">
+            <h3 style="color: #f57c00; margin-bottom: 15px; text-align: center;">选择新宠物 🐾</h3>
+            <p id="pet-selection-message" style="font-size: 1rem; margin-bottom: 20px; text-align: center;"></p>
+            <div id="pet-selection-list" style="display: flex; flex-wrap: wrap; gap: 16px; justify-content: center; margin: 20px 0;">
+                <!-- 宠物选项将动态生成 -->
+            </div>
+            <div style="text-align: center; margin-top: 20px;">
+                <button class="cancel-btn" style="background-color: #9e9e9e;">取消</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 惩罚确认模态框 -->
+    <div id="penalty-confirm-modal" class="modal-overlay">
+        <div class="modal-content">
+            <p style="color: #c62828; font-weight: bold;">⚠️ 警告</p>
+            <p style="font-size: 1.1rem; margin: 15px 0;">更换宠物将清空所有 ❤️ 爱心！是否继续？</p>
+            <div style="margin-top: 20px;">
+                <button id="penalty-confirm-btn" style="background-color: #f44336;">确认更换</button>
+                <button class="cancel-btn" style="background-color: #9e9e9e;">取消</button>
+            </div>
+        </div>
+    </div>
+
+    
+    <!-- 兑换弹窗 -->
+    <div id="redeem-modal-overlay" class="modal-overlay">
+        <div id="redeem-modal-content" class="modal-content">
+            <div id="redeem-modal-header">
+                <h3 id="redeem-modal-title">兑换奖励</h3>
+                <div id="redeem-student-info">徽章: <span>0</span></div>
+            </div>
+            <div id="redeem-prize-list"></div>
+            <div style="text-align: center; margin-top: 20px;">
+                <button id="close-redeem-modal-btn" class="cancel-btn" style="background-color: #9e9e9e;">关闭</button>
+            </div>
+        </div>
+    </div>
+    <div id="redeem-confirm-modal" class="modal-overlay">
+        <div class="modal-content">
+            <p id="redeem-confirm-text" style="font-size: 1.1rem;"></p>
+            <div style="margin-top: 20px;">
+                <button id="confirm-redeem-btn" style="background-color: #ff9800;">确认兑换</button>
+                <button id="cancel-redeem-btn" class="cancel-btn" style="background-color: #9e9e9e;">取消</button>
+            </div>
+        </div>
+    </div>
+        <script>
+        // 自动推导 static 目录，兼容直接打开与服务端渲染
+        const staticBase = new URL('../static/', window.location.href);
+        window.STATIC_BASE_URL = staticBase.href;
+    </script>
+    <script src="../static/js/app.js"></script>
+
+</body>
+</html>
