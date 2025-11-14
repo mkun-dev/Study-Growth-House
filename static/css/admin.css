@@ -5,12 +5,12 @@ body {
     font-family: 'Microsoft YaHei','微软雅黑',Arial,sans-serif;
 }
 .admin-container {
-    max-width: 900px;
+    max-width: 1200px;
     margin: 30px auto 60px;
-    padding: 0 16px;
+    padding: 0 32px;
 }
 #admin-panel {
-    padding: 32px 34px;
+    padding: 48px 52px;
     border-radius: 18px;
     background: #ffffff;
     box-shadow: 0 20px 40px rgba(0,0,0,0.08);
@@ -39,9 +39,27 @@ body {
     flex: 1;
     min-width: 220px;
 }
+
+@media (max-width: 1024px) {
+    .admin-container {
+        max-width: 900px;
+        padding: 0 16px;
+    }
+    #admin-panel {
+        padding: 32px 34px;
+    }
+    .admin-class-controls {
+        gap: 14px;
+    }
+}
 .admin-class-create-inline {
     display: flex;
     gap: 8px;
+}
+.admin-class-password {
+    flex: 1;
+    min-width: 220px;
+    margin-top: 12px;
 }
 .admin-class-create-inline input,
 .admin-class-select select {
@@ -50,6 +68,11 @@ body {
     border: 1px solid #e0e0e0;
     border-radius: 8px;
     font-size: 0.95rem;
+}
+.admin-class-password small {
+    display: block;
+    margin-top: 6px;
+    color: #757575;
 }
 #admin-setup-title {
     text-align: center;

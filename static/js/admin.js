@@ -1,15 +1,24 @@
 (function () {
-    const AUTH_KEY = 'admin_auth_token';
-    const AUTH_VALUE = 'granted';
-    if (localStorage.getItem(AUTH_KEY) !== AUTH_VALUE) {
-        window.location.href = 'login.html';
-        return;
-    }
     const STORAGE_KEY = 'pet_game_multiclass_data_v2';
     const GROWTH_KEY = 'pet_growth_settings';
-    const TITLE_KEY = 'pet_game_title_v2';
+    const MAIN_TITLE_DEFAULT = '宠物屋';
     const PET_TYPES = ['cat_orange', 'cat_black', 'dog_corgi', 'dog_border'];
     const uuid = () => (crypto.randomUUID ? crypto.randomUUID() : `id_${Date.now()}_${Math.random().toString(16).slice(2)}`);
+    const APP_CONFIG = window.APP_CONFIG || {};
+    if (!window.APP_CONFIG) {
+        window.APP_CONFIG = APP_CONFIG;
+    }
+    const API_ROUTES = APP_CONFIG.routes || {};
+
+    const cloneData = (data, fallback = {}) => {
+        if (data == null) return fallback;
+        try {
+            return JSON.parse(JSON.stringify(data));
+        } catch (err) {
+            console.warn('数据复制失败，使用默认值', err);
+            return fallback;
+        }
+    };
 
     const refs = {
         toast: document.getElementById('admin-toast'),
@@ -17,6 +26,8 @@
         newClassInput: document.getElementById('admin-new-class-name'),
         addClassBtn: document.getElementById('admin-add-class'),
         deleteClassBtn: document.getElementById('admin-delete-class'),
+        classPasswordInput: document.getElementById('admin-class-password'),
+        saveClassPasswordBtn: document.getElementById('admin-save-class-password'),
         classNameLabel: document.getElementById('admin-current-class-name'),
         studentInput: document.getElementById('admin-student-input'),
         saveStudentsBtn: document.getElementById('admin-save-students'),
@@ -66,8 +77,9 @@
         refs.classSelect.addEventListener('change', (e) => selectClass(e.target.value));
         refs.addClassBtn.addEventListener('click', handleCreateClass);
         refs.deleteClassBtn.addEventListener('click', handleDeleteClass);
+        refs.saveClassPasswordBtn.addEventListener('click', handleSaveClassPassword);
         refs.saveStudentsBtn.addEventListener('click', addStudentsFromInput);
-        refs.enterGardenBtn.addEventListener('click', () => window.location.href = 'index.html');
+        refs.enterGardenBtn.addEventListener('click', () => window.location.href = '/');
         refs.createGroupBtn.addEventListener('click', handleCreateGroup);
         refs.addPrizeBtn.addEventListener('click', addPrizeFromForm);
         refs.saveGrowthBtn.addEventListener('click', saveGrowthSettings);
@@ -86,21 +98,26 @@
     }
 
     function loadClasses() {
-        try {
-            const raw = localStorage.getItem(STORAGE_KEY);
-            if (!raw) return {};
-            const parsed = JSON.parse(raw);
+        if (Object.prototype.hasOwnProperty.call(APP_CONFIG, 'initialData')) {
+            const parsed = cloneData(APP_CONFIG.initialData, {});
             Object.values(parsed).forEach(ensureClassStructure);
             return parsed;
-        } catch (err) {
-            console.warn('加载班级数据失败，使用空结构。', err);
-            return {};
         }
+        return {};
     }
 
+
     function saveClasses() {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(state.classes));
+        APP_CONFIG.initialData = cloneData(state.classes, {});
+        window.APP_CONFIG.initialData = APP_CONFIG.initialData;
+        if (!API_ROUTES.saveData) return;
+        fetch(API_ROUTES.saveData, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ data: state.classes })
+        }).catch(err => console.error('同步班级数据失败:', err));
     }
+
 
     function ensureClassStructure(cls) {
         if (!cls) return;
@@ -109,6 +126,7 @@
         cls.groups = Array.isArray(cls.groups) ? cls.groups : [];
         cls.prizes = Array.isArray(cls.prizes) ? cls.prizes : [];
         cls.dailyGoal = typeof cls.dailyGoal === 'string' ? cls.dailyGoal : '';
+        cls.password = typeof cls.password === 'string' ? cls.password : '';
         cls.students.forEach(ensureStudentStructure);
         return cls;
     }
@@ -132,26 +150,36 @@
 
     function loadGrowthSettings() {
         const defaults = { lv2: 4, lv3: 8 };
-        try {
-            const raw = localStorage.getItem(GROWTH_KEY);
-            if (!raw) return defaults;
-            const parsed = JSON.parse(raw);
+        if (APP_CONFIG.growthSettings) {
             return {
-                lv2: Number(parsed.level2Threshold) || defaults.lv2,
-                lv3: Number(parsed.level3Threshold) || defaults.lv3
+                lv2: Number(APP_CONFIG.growthSettings.level2Threshold) || defaults.lv2,
+                lv3: Number(APP_CONFIG.growthSettings.level3Threshold) || defaults.lv3
             };
-        } catch (err) {
-            console.warn('加载成长配置失败，使用默认值。', err);
-            return defaults;
         }
+        return defaults;
     }
 
+
+
+
     function persistGrowthSettings() {
-        localStorage.setItem(GROWTH_KEY, JSON.stringify({
+        const payload = {
             level2Threshold: state.thresholds.lv2,
             level3Threshold: state.thresholds.lv3
-        }));
+        };
+        if (!window.APP_CONFIG) {
+            window.APP_CONFIG = {};
+        }
+        window.APP_CONFIG.growthSettings = { ...payload };
+        if (!API_ROUTES.saveGrowth) return;
+        fetch(API_ROUTES.saveGrowth, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        }).catch(err => console.error('同步成长设置失败:', err));
     }
+
+
 
     function renderClassOptions() {
         const ids = Object.keys(state.classes);
@@ -177,7 +205,8 @@
             students: [],
             groups: [],
             prizes: [],
-            dailyGoal: ''
+            dailyGoal: '',
+            password: ''
         });
         saveClasses();
         return id;
@@ -213,12 +242,24 @@
         showToast(`班级“${className}”已删除。`);
     }
 
+    function handleSaveClassPassword() {
+        const current = getCurrentClass();
+        if (!current) return;
+        current.password = (refs.classPasswordInput.value || '').trim();
+        saveClasses();
+        showToast('班级密码已保存');
+    }
+
+
     function selectClass(classId) {
         if (!classId || !state.classes[classId]) return;
         state.selectedClassId = classId;
         ensureClassStructure(state.classes[classId]);
         refs.classSelect.value = classId;
         refs.classNameLabel.textContent = state.classes[classId].name;
+        if (refs.classPasswordInput) {
+            refs.classPasswordInput.value = state.classes[classId].password || '';
+        }
         renderStudents();
         renderGroups();
         renderPrizes();
@@ -560,9 +601,6 @@
                 selectedClassId = rows[0].selectedClassId || null;
                 thresholds.lv2 = rows[0].petLevel2Threshold || 4;
                 thresholds.lv3 = rows[0].petLevel3Threshold || 8;
-                if (rows[0].mainTitle) {
-                    localStorage.setItem(TITLE_KEY, rows[0].mainTitle);
-                }
             }
         }
 
@@ -575,6 +613,7 @@
                 id: classId,
                 name: row.name || '未命名班级',
                 dailyGoal: row.dailyGoal || '',
+                password: row.password || '',
                 students: [],
                 groups: [],
                 prizes: []
@@ -627,7 +666,7 @@
             const wb = XLSX.utils.book_new();
             const globalSettings = [{
                 selectedClassId: state.selectedClassId,
-                mainTitle: localStorage.getItem(TITLE_KEY) || '宠物屋',
+                mainTitle: MAIN_TITLE_DEFAULT,
                 petLevel2Threshold: state.thresholds.lv2,
                 petLevel3Threshold: state.thresholds.lv3
             }];
@@ -636,7 +675,8 @@
             const classesInfo = entries.map(([id, cls]) => ({
                 id,
                 name: cls.name,
-                dailyGoal: cls.dailyGoal || ''
+                dailyGoal: cls.dailyGoal || '',
+                password: cls.password || ''
             }));
             XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(classesInfo), 'Classes_勿动');
 

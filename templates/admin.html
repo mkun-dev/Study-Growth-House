@@ -4,9 +4,13 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>后台管理</title>
-    <link rel="stylesheet" href="../static/css/style.css">
-    <link rel="stylesheet" href="../static/css/admin.css">
-    <script src="../static/js/xlsx.full.min.js"></script>
+    <link rel="stylesheet" href="{{ url_for('static', path='css/style.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', path='css/admin.css') }}">
+    <script src="{{ url_for('static', path='js/xlsx.full.min.js') }}" defer></script>
+    <script>
+        window.STATIC_BASE_URL = "{{ app_config.staticBase }}";
+        window.APP_CONFIG = {{ app_config | tojson | safe }};
+    </script>
 </head>
 <body>
     <div id="admin-toast" class="admin-toast" role="status" aria-live="polite"></div>
@@ -28,6 +32,14 @@
                     </div>
                 </div>
                 <button id="admin-delete-class" class="admin-btn admin-ghost">删除班级</button>
+                <div class="admin-class-password">
+                    <label for="admin-class-password">班级密码</label>
+                    <div class="admin-class-create-inline">
+                        <input id="admin-class-password" type="text" placeholder="设置或修改班级密码">
+                        <button id="admin-save-class-password" class="admin-btn admin-secondary">保存密码</button>
+                    </div>
+                    <small style="color:#666;">学生端进入该班级时需要输入此密码。</small>
+                </div>
             </div>
 
             <h2 id="admin-setup-title">为班级 “<span id="admin-current-class-name">-</span>” 设置名单</h2>
@@ -113,6 +125,6 @@
         </div>
     </div>
 
-    <script src="../static/js/admin.js" defer></script>
+    <script src="{{ url_for('static', path='js/admin.js') }}" defer></script>
 </body>
 </html>

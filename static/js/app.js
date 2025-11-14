@@ -1,4 +1,4 @@
-const STATIC_BASE_URL = (() => {
+﻿const STATIC_BASE_URL = (() => {
     const base = window.STATIC_BASE_URL || '/static/';
     return base.endsWith('/') ? base : `${base}/`;
 })();
@@ -10,6 +10,66 @@ const getStudentHeartCount = (student) => {
     if (typeof student.collectedPlants === 'string') return student.collectedPlants.length;
     return 0;
 };
+
+const APP_CONFIG = window.APP_CONFIG || {};
+if (!window.APP_CONFIG) {
+    window.APP_CONFIG = APP_CONFIG;
+}
+const API_ROUTES = APP_CONFIG.routes || {};
+
+const cloneData = (data, fallback = {}) => {
+    if (data == null) return fallback;
+    try {
+        return JSON.parse(JSON.stringify(data));
+    } catch (err) {
+        console.warn('复制数据失败，使用默认值', err);
+        return fallback;
+    }
+};
+
+const updateInitialDataCache = (data) => {
+    const cloned = cloneData(data, {});
+    APP_CONFIG.initialData = cloned;
+    window.APP_CONFIG.initialData = cloned;
+};
+
+const persistDataToServer = (data) => {
+    if (!API_ROUTES.saveData) return Promise.resolve();
+    return fetch(API_ROUTES.saveData, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ data })
+    }).then(res => {
+        if (!res.ok) throw new Error('Failed to save data');
+        updateInitialDataCache(data);
+    }).catch(err => console.error('同步服务器数据失败:', err));
+};
+
+const persistGrowthSettingsToServer = (settings) => {
+    if (!API_ROUTES.saveGrowth) return Promise.resolve();
+    return fetch(API_ROUTES.saveGrowth, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(settings)
+    }).then(res => {
+        if (!res.ok) throw new Error('Failed to save growth settings');
+    }).catch(err => console.error('同步成长设置失败:', err));
+};
+
+async function refreshDataFromServer() {
+    if (!API_ROUTES.getData) return;
+    try {
+        const response = await fetch(API_ROUTES.getData, { cache: 'no-store' });
+        if (!response.ok) throw new Error('Failed to fetch latest data');
+        const payload = await response.json();
+        if (payload && payload.data) {
+            allClassData = cloneData(payload.data, {});
+            updateInitialDataCache(allClassData);
+        }
+    } catch (err) {
+        console.error('从服务器同步最新数据失败:', err);
+    }
+}
 
 // 音效管理器
 const soundManager = {
@@ -48,7 +108,7 @@ const petLibrary = {
     }
 };
 
-// 宠物成长门槛设置（从localStorage加载，若无则使用默认值）
+// 宠物成长门槛设置（从服务器缓存加载，若无则使用默认值）
 let PET_LEVEL_2_THRESHOLD = 4;  // LV2：4个爱心
 let PET_LEVEL_3_THRESHOLD = 8;  // LV3：8个爱心
 let PET_LEVEL_4_THRESHOLD = 12; // LV4（徽章）：12个爱心
@@ -149,11 +209,18 @@ const mainTitle = document.getElementById('main-title'),
       redeemPrizeList = document.getElementById('redeem-prize-list'),
       redeemConfirmModal = document.getElementById('redeem-confirm-modal'),
       redeemConfirmText = document.getElementById('redeem-confirm-text'),
-      confirmRedeemBtn = document.getElementById('confirm-redeem-btn');
+      confirmRedeemBtn = document.getElementById('confirm-redeem-btn'),
+      cancelRedeemBtn = document.getElementById('cancel-redeem-btn'),
+      redeemModalCloseBtn = document.querySelector('#redeem-modal-overlay .close-redeem-modal'),
+      classPasswordModal = document.getElementById('class-password-modal'),
+      classPasswordTitle = document.getElementById('class-password-title'),
+      classPasswordHint = document.getElementById('class-password-hint'),
+      classPasswordInput = document.getElementById('class-password-input'),
+      classPasswordError = document.getElementById('class-password-error'),
+      classPasswordConfirmBtn = document.getElementById('class-password-confirm-btn'),
+      classPasswordCancelBtn = document.getElementById('class-password-cancel-btn');
 
 // 应用状态变量
-const STORAGE_KEY = 'pet_game_multiclass_data_v2'; // 宠物游戏专用的存储key
-const TITLE_KEY = 'pet_game_title_v2';
 const DEFAULT_TITLE = '🐾 宠物屋 🏠';
 
 let allClassData = {}; // 所有班级数据
@@ -168,223 +235,82 @@ let groupIdToPenalize = null;
 let importFileEvent = null;
 let studentIdForManualAction = null;
 let currentRedeemInfo = { studentId: null, prizeId: null };
+let pendingClassAccessId = null;
+let wasRedeemModalOpenBeforeConfirm = false;
 
 // 初始化应用
 function initApp() {
-    console.log('🚀 初始化宠物游戏...');
+    console.log('🚀 初始化宠物屋...');
 
-    // 尝试从旧存储键迁移数据
-    migrateOldData();
-
-    // 尝试加载主数据
     loadAllClassData();
-
-    // 如果主数据为空，尝试从其他存储键恢复
-    if (Object.keys(allClassData).length === 0) {
-        console.log('🔧 主数据为空，尝试从其他地方恢复数据...');
-
-        // 尝试从旧的打卡花园键恢复
-        try {
-            const oldData = localStorage.getItem('garden_multiclass_shop_v1');
-            if (oldData) {
-                console.log('🔧 发现旧数据，正在迁移...');
-                allClassData = JSON.parse(oldData);
-                saveAllClassData(); // 保存到新键
-                loadAllClassData(); // 重新加载
-            }
-        } catch(e) {
-            console.log('🔧 旧数据迁移失败:', e);
-        }
-
-        // 尝试恢复备份
-        if (Object.keys(allClassData).length === 0 && restoreDataBackup()) {
-            loadAllClassData(); // 重新加载恢复的数据
-            loadTitle();
-        }
-    }
-
     loadTitle();
-    loadGrowthSettings(); // 加载宠物成长门槛设置
-    initGrowthSettingsUI(); // 初始化设置界面
-    showClassMode(); // 首先显示班级选择
+    loadGrowthSettings();
+    initGrowthSettingsUI();
+    showClassMode(true);
     setupEventListeners();
 
-    // 创建自动备份
-    saveDataBackup();
-
-    console.log('✅ 宠物游戏初始化完成');
+    console.log('✅ 宠物屋初始化完成');
 }
+
 
 // 数据迁移功能
-function migrateOldData() {
-    try {
-        // 尝试从旧的存储键迁移标题
-        const oldTitle = localStorage.getItem('garden_title_multiclass_shop_v1');
-        if (oldTitle && !localStorage.getItem(TITLE_KEY)) {
-            localStorage.setItem(TITLE_KEY, oldTitle);
-            console.log('🔧 已迁移旧标题数据');
-        }
-
-        // 尝试从旧的备份键迁移
-        const oldBackup = localStorage.getItem('pet_game_backup');
-        if (oldBackup && !localStorage.getItem('pet_game_backup_v2')) {
-            localStorage.setItem('pet_game_backup_v2', oldBackup);
-            console.log('🔧 已迁移旧备份数据');
-        }
-    } catch(e) {
-        console.log('🔧 数据迁移失败:', e);
-    }
-}
-
 // ====== 数据管理 (多班级) ======
 function loadAllClassData() {
-    const data = localStorage.getItem(STORAGE_KEY);
-    if(data) {
-        try {
-            allClassData = JSON.parse(data);
-            console.log('🔧 数据加载成功:', Object.keys(allClassData).length, '个班级');
-        } catch(e) {
-            console.error('❌ 数据加载失败:', e);
-            allClassData = {};
-        }
-    } else {
-        console.log('🔧 没有找到保存的数据，使用空数据');
-        allClassData = {};
+    if (window.APP_CONFIG && Object.prototype.hasOwnProperty.call(window.APP_CONFIG, 'initialData')) {
+        allClassData = cloneData(window.APP_CONFIG.initialData, {});
+        console.log('从服务器配置加载数据:', Object.keys(allClassData).length, '个班级');
+        return;
     }
+    allClassData = {};
+    console.log('未从服务器获得数据，使用空班级列表');
 }
+
 
 function saveAllClassData() {
     try {
-        console.log('🔧 saveAllClassData 开始执行');
-        console.log('🔧 要保存的数据:', allClassData);
-
-        // 强制序列化数据
-        const dataStr = JSON.stringify(allClassData);
-
-        // 多重保存策略
-        localStorage.setItem(STORAGE_KEY, dataStr);
-
-        // Chrome兼容性修复：强制刷新localStorage
-        localStorage.setItem(STORAGE_KEY + '_refresh', Date.now());
-        localStorage.removeItem(STORAGE_KEY + '_refresh');
-
-        // 额外的安全保存
-        localStorage.setItem(STORAGE_KEY + '_backup', dataStr);
-
-        // 验证保存是否成功
-        const saved = localStorage.getItem(STORAGE_KEY);
-        if (saved) {
-            const parsed = JSON.parse(saved);
-            console.log('✅ 数据保存成功:', Object.keys(parsed).length, '个班级');
-
-            // 验证当前班级数据
-            if (currentClassId && parsed[currentClassId]) {
-                const classData = parsed[currentClassId];
-                console.log('🔧 当前班级验证:', {
-                    name: classData.name,
-                    students: classData.students?.length || 0,
-                    groups: classData.groups?.length || 0,
-                    prizes: classData.prizes?.length || 0
-                });
-            }
-
-            // 每次保存成功后自动备份
-            saveDataBackup();
-
-            // 在控制台显示存储键名，便于调试
-            console.log('🔧 数据已保存到:', STORAGE_KEY);
-        } else {
-            console.error('❌ 数据保存验证失败');
-        }
-    } catch(e) {
-        console.error('❌ 数据保存失败:', e);
+        console.log('saveAllClassData start');
+        updateInitialDataCache(allClassData);
+        persistDataToServer(allClassData);
+    } catch (e) {
+        console.error('数据保存失败:', e);
     }
 }
+
 function loadTitle() {
     mainTitle.innerHTML = DEFAULT_TITLE;
-    try { localStorage.removeItem(TITLE_KEY); } catch (e) {}
 }
+
 
 // 数据备份和恢复功能
-function createDataBackup() {
-    const backup = {
-        version: '1.0',
-        timestamp: new Date().toISOString(),
-        data: allClassData,
-        settings: {
-            title: DEFAULT_TITLE,
-            growthSettings: localStorage.getItem('pet_growth_settings')
-        }
-    };
-    return backup;
-}
-
-function saveDataBackup() {
-    try {
-        const backup = createDataBackup();
-        localStorage.setItem('pet_game_backup_v2', JSON.stringify(backup));
-        console.log('✅ 数据备份已创建');
-        return true;
-    } catch(e) {
-        console.error('❌ 数据备份失败:', e);
-        return false;
-    }
-}
-
-function restoreDataBackup() {
-    try {
-        const backupStr = localStorage.getItem('pet_game_backup_v2');
-        if (!backupStr) {
-            console.log('🔧 没有找到备份数据');
-            return false;
-        }
-
-        const backup = JSON.parse(backupStr);
-        console.log('🔧 恢复备份:', new Date(backup.timestamp));
-
-        // 恢复数据
-        allClassData = backup.data;
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(allClassData));
-
-        // 恢复设置
-        mainTitle.innerHTML = DEFAULT_TITLE;
-        if (backup.settings.growthSettings) {
-            localStorage.setItem('pet_growth_settings', backup.settings.growthSettings);
-        }
-
-        console.log('✅ 数据恢复成功');
-        return true;
-    } catch(e) {
-        console.error('❌ 数据恢复失败:', e);
-        return false;
-    }
-}
-
 // 宠物成长门槛设置相关函数
 function saveGrowthSettings() {
     const settings = {
         level2Threshold: PET_LEVEL_2_THRESHOLD,
         level3Threshold: PET_LEVEL_3_THRESHOLD
     };
-    localStorage.setItem('pet_growth_settings', JSON.stringify(settings));
+    if (!window.APP_CONFIG) {
+        window.APP_CONFIG = {};
+    }
+    window.APP_CONFIG.growthSettings = { ...settings };
+    persistGrowthSettingsToServer(settings);
 }
 
+
 function loadGrowthSettings() {
-    const saved = localStorage.getItem('pet_growth_settings');
+    const saved = window.APP_CONFIG && window.APP_CONFIG.growthSettings;
     if (saved) {
-        try {
-            const settings = JSON.parse(saved);
-            PET_LEVEL_2_THRESHOLD = settings.level2Threshold || 4;
-            PET_LEVEL_3_THRESHOLD = settings.level3Threshold || 8;
-        } catch (e) {
-            console.log('加载成长门槛设置失败，使用默认值');
-        }
+        PET_LEVEL_2_THRESHOLD = saved.level2Threshold || 4;
+        PET_LEVEL_3_THRESHOLD = saved.level3Threshold || 8;
+        return;
     }
+    PET_LEVEL_2_THRESHOLD = 4;
+    PET_LEVEL_3_THRESHOLD = 8;
 }
+
 
 // 初始化成长设置界面
 function initGrowthSettingsUI() {
-    // 如果localStorage中有错误的值（如5），清理并使用正确的默认值
+    // 如果服务器缓存中有错误的值（如5），清理并使用正确的默认值
     if (PET_LEVEL_2_THRESHOLD === 5) {
         PET_LEVEL_2_THRESHOLD = 4;
         saveGrowthSettings(); // 保存正确的值
@@ -433,7 +359,7 @@ function handleSaveGrowthSettings() {
     PET_LEVEL_2_THRESHOLD = newLevel2;
     PET_LEVEL_3_THRESHOLD = newLevel3;
 
-    // 保存到localStorage
+    // 保存到服务器缓存
     saveGrowthSettings();
 
     // 显示保存成功提示
@@ -441,7 +367,10 @@ function handleSaveGrowthSettings() {
 }
 
 // ====== 视图切换 (多班级) ======
-function showClassMode() {
+async function showClassMode(forceRefresh = false) {
+    if (forceRefresh) {
+        await refreshDataFromServer();
+    }
     classMode.style.display = 'block';
     setupMode.style.display = 'none';
     gameMode.style.display = 'none';
@@ -506,18 +435,16 @@ function renderClassList() {
         const classData = allClassData[classId];
         const card = document.createElement("div");
         card.className = "class-card";
-        card.onclick = function() {
-            selectClass(classId);
-        };
-                        card.innerHTML = `
+        card.addEventListener('click', () => handleClassCardClick(classId));
+        card.innerHTML = `
             <div class="class-card-content">
                 <h3>${classData.name}</h3>
                 <p>${(classData.students || []).length} 名学生</p>
             </div>
-            </div>`;
+        `;
         classCardGrid.appendChild(card);
 
-                    }
+    }
 }
 
 function showCreateClassModal() {
@@ -541,7 +468,8 @@ function handleCreateClass() {
         students: [],
         groups: [],
         prizes: [],
-        dailyGoal: ""
+        dailyGoal: "",
+        password: ""
     };
 
     // 强制保存数据（Chrome兼容性修复）
@@ -562,17 +490,24 @@ function handleCreateClass() {
     }, 100);
 }
 
-function selectClass(classId) {
+async function selectClass(classId) {
+    if (!classId) return;
+    const classData = allClassData[classId];
+    if (!classData) {
+        console.warn('找不到班级数据，尝试刷新:', classId);
+        await showClassMode(true);
+        return;
+    }
+
     currentClassId = classId;
     isSelectMode = false;
     selectedStudentIds.clear();
 
-    // 确保所选班级数据结构完整
-    const classData = allClassData[currentClassId];
     if (!classData.students) classData.students = [];
     if (!classData.groups) classData.groups = [];
     if (!classData.prizes) classData.prizes = [];
     if (classData.dailyGoal === undefined) classData.dailyGoal = "";
+    if (typeof classData.password !== 'string') classData.password = "";
 
     (classData.students.length > 0 ? showGameMode : showSetupMode)();
 }
@@ -582,10 +517,6 @@ function deleteClass(classId) {
         soundManager.init();
         soundManager.playDelete();
         delete allClassData[classId];
-
-        // 强制清理相关备份数据，防止恢复
-        localStorage.removeItem('pet_game_backup_v2');
-        localStorage.removeItem('garden_multiclass_shop_v1');
 
         saveAllClassData();
         renderClassList();
@@ -606,8 +537,8 @@ function showConfirmModal(text, onConfirm, isDanger = false) {
 function setupEventListeners() {
 
     // 多班级按钮
-    backToClassSelectBtn.addEventListener('click', showClassMode);
-    switchClassBtn.addEventListener('click', showClassMode);
+    backToClassSelectBtn.addEventListener('click', () => showClassMode(true));
+    switchClassBtn.addEventListener('click', () => showClassMode(true));
     createClassConfirmBtn.addEventListener('click', handleCreateClass);
 
     saveStudentsBtn.addEventListener('click', () => { soundManager.init(); soundManager.playClick(); handleSaveStudents(); });
@@ -616,6 +547,44 @@ function setupEventListeners() {
         manageStudentsBtn.addEventListener('click', () => { soundManager.init(); soundManager.playClick(); showSetupMode(); });
     }
     undoBtn.addEventListener('click', () => { soundManager.init(); soundManager.playUndo(); handleUndo(); });
+    if (classPasswordConfirmBtn) {
+        classPasswordConfirmBtn.addEventListener('click', () => {
+            soundManager.init();
+            soundManager.playClick();
+            confirmClassPassword();
+        });
+    }
+    if (classPasswordCancelBtn) {
+        classPasswordCancelBtn.addEventListener('click', () => {
+            soundManager.init();
+            soundManager.playClick();
+            closeClassPasswordModal();
+        });
+    }
+    if (classPasswordInput) {
+        classPasswordInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                confirmClassPassword();
+            }
+        });
+        classPasswordInput.addEventListener('input', () => {
+            if (classPasswordError) {
+                classPasswordError.style.display = 'none';
+            }
+        });
+    }
+    if (classPasswordModal) {
+        classPasswordModal.addEventListener('click', (e) => {
+            if (e.target === classPasswordModal) {
+                closeClassPasswordModal();
+            }
+        });
+    }
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && classPasswordModal && classPasswordModal.classList.contains('show')) {
+            closeClassPasswordModal();
+        }
+    });
 
     dailyGoal.addEventListener('input', () => {
         // 保存到当前班级
@@ -626,16 +595,47 @@ function setupEventListeners() {
     });
 
     // 统一弹窗
-    document.querySelectorAll('.cancel-btn').forEach(btn => btn.addEventListener('click', () => {
-        btn.closest('.modal-overlay').classList.remove('show');
-        isProcessingClick = false; // 重置点击状态
+    document.querySelectorAll('.cancel-btn').forEach(btn => btn.addEventListener('click', (event) => {
+        if (btn.classList.contains('close-redeem-modal')) return;
+        const overlay = btn.closest('.modal-overlay');
+        if (overlay) {
+            overlay.classList.remove('show');
+        }
+        isProcessingClick = false; // ????????
     }));
     document.querySelectorAll('.modal-overlay').forEach(modal => modal.addEventListener('click', e => {
         if (e.target === modal) {
             modal.classList.remove('show');
-            isProcessingClick = false; // 重置点击状态
+            if (modal === redeemConfirmModal) {
+                currentRedeemInfo.prizeId = null;
+                if (wasRedeemModalOpenBeforeConfirm && redeemModalOverlay) {
+                    redeemModalOverlay.classList.add('show');
+                }
+                wasRedeemModalOpenBeforeConfirm = false;
+            }
+            isProcessingClick = false; // ????????
         }
     }));
+    if (redeemModalCloseBtn) {
+        redeemModalCloseBtn.addEventListener('click', (event) => {
+            event.preventDefault();
+            event.stopImmediatePropagation();
+            closeRedeemModal();
+        });
+    }
+    if (cancelRedeemBtn && redeemConfirmModal) {
+        cancelRedeemBtn.addEventListener('click', (event) => {
+            event.preventDefault();
+            event.stopImmediatePropagation();
+            redeemConfirmModal.classList.remove('show');
+            if (wasRedeemModalOpenBeforeConfirm && redeemModalOverlay) {
+                redeemModalOverlay.classList.add('show');
+            }
+            wasRedeemModalOpenBeforeConfirm = false;
+            currentRedeemInfo.prizeId = null;
+            isProcessingClick = false;
+        });
+    }
     modalEnterGardenBtn.addEventListener('click', () => { soundManager.init(); soundManager.playClick(); unifiedModal.classList.remove('show'); showGameMode(); });
 
     // 核心功能按钮
@@ -722,6 +722,79 @@ function setupEventListeners() {
     // 商城管理
     addPrizeBtn.addEventListener('click', handleAddPrize);
     confirmRedeemBtn.addEventListener('click', confirmRedeem);
+}
+
+function handleClassCardClick(classId) {
+    const classData = allClassData[classId];
+    if (!classData) return;
+
+    if (!classData.password || !classData.password.trim()) {
+        selectClass(classId);
+        return;
+    }
+
+    if (!classPasswordModal || !classPasswordInput) {
+        selectClass(classId);
+        return;
+    }
+
+    pendingClassAccessId = classId;
+    if (classPasswordTitle) {
+        classPasswordTitle.textContent = `进入班级「${classData.name}」`;
+    }
+    if (classPasswordHint) {
+        classPasswordHint.textContent = classData.password.trim()
+            ? '请输入该班级的进入密码'
+            : '该班级未设置密码（留空即可）';
+    }
+    classPasswordInput.value = '';
+    classPasswordInput.placeholder = classData.password ? '请输入班级密码' : '当前未设置密码';
+    setTimeout(() => classPasswordInput.focus(), 50);
+    if (classPasswordError) {
+        classPasswordError.style.display = 'none';
+    }
+
+    classPasswordModal.classList.add('show');
+    classPasswordModal.removeAttribute('aria-hidden');
+}
+
+function closeClassPasswordModal() {
+    pendingClassAccessId = null;
+    if (classPasswordModal) {
+        classPasswordModal.classList.remove('show');
+        classPasswordModal.setAttribute('aria-hidden', 'true');
+    }
+    if (classPasswordError) {
+        classPasswordError.style.display = 'none';
+    }
+    if (document.activeElement && classPasswordModal && classPasswordModal.contains(document.activeElement)) {
+        document.activeElement.blur();
+    }
+}
+
+async function confirmClassPassword() {
+    if (!pendingClassAccessId) return;
+    const targetId = pendingClassAccessId;
+    const classData = allClassData[targetId];
+    if (!classData) {
+        closeClassPasswordModal();
+        return;
+    }
+    if (!classPasswordModal || !classPasswordInput) {
+        await selectClass(targetId);
+        pendingClassAccessId = null;
+        return;
+    }
+    const expected = (typeof classData.password === 'string' ? classData.password : '').trim();
+    const entered = classPasswordInput.value.trim();
+    if (entered === expected) {
+        closeClassPasswordModal();
+        await selectClass(targetId);
+        pendingClassAccessId = null;
+    } else if (classPasswordError) {
+        classPasswordError.textContent = '密码错误，请重试';
+        classPasswordError.style.display = 'block';
+    }
 }
 
 // ====== 学生设置 (已适配多班级) ======
@@ -2033,7 +2106,8 @@ function handleExportData() {
         const classesInfo = Object.entries(allClassData).map(([classId, classData]) => ({
             id: classId,
             name: classData.name,
-            dailyGoal: classData.dailyGoal || ""
+            dailyGoal: classData.dailyGoal || "",
+            password: classData.password || ""
         }));
         XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(classesInfo), "Classes_勿动");
 
@@ -2129,6 +2203,7 @@ function importExcelData(file) {
                     id: classId,
                     name: classInfo.name || '未命名班级',
                     dailyGoal: classInfo.dailyGoal || '',
+                    password: classInfo.password || '',
                     students: [],
                     groups: [],
                     prizes: []
@@ -2206,10 +2281,7 @@ function importExcelData(file) {
 
             // 保存数据
             saveAllClassData();
-            localStorage.setItem('pet_growth_settings', JSON.stringify({
-                level2Threshold: PET_LEVEL_2_THRESHOLD,
-                level3Threshold: PET_LEVEL_3_THRESHOLD
-            }));
+            saveGrowthSettings();
 
             alert(`✅ Excel数据导入成功！\n恢复了 ${Object.keys(allClassData).length} 个班级的所有数据！`);
 
@@ -2510,8 +2582,20 @@ function renderShopView() {
     shopViewContainer.appendChild(listContainer);
 }
 
+function closeRedeemModal() {
+    if (redeemModalOverlay) {
+        redeemModalOverlay.classList.remove('show');
+    }
+    if (redeemConfirmModal) {
+        redeemConfirmModal.classList.remove('show');
+    }
+    currentRedeemInfo = { studentId: null, prizeId: null };
+    wasRedeemModalOpenBeforeConfirm = false;
+    isProcessingClick = false;
+}
+
 function openRedeemModal(studentId) {
-    currentRedeemInfo.studentId = studentId; // 存储当前学生ID
+    currentRedeemInfo.studentId = studentId; // 储存当前学生ID
     const student = allClassData[currentClassId].students.find(s => s.id === studentId);
     if (!student) return;
 
@@ -2526,7 +2610,7 @@ function openRedeemModal(studentId) {
     const prizes = allClassData[currentClassId].prizes;
     if (prizes.length === 0) {
         redeemPrizeList.innerHTML = '<p style="text-align: center; color: #888;">商城暂无奖品</p>';
-        redeemModalOverlay.classList.add('show'); // 确保即使没奖品也显示弹窗
+        redeemModalOverlay.classList.add('show');
         return;
     }
 
@@ -2534,7 +2618,7 @@ function openRedeemModal(studentId) {
         const canAfford = availableBadges >= prize.cost;
         const isOutOfStock = prize.stock === 0;
         const canRedeem = canAfford && !isOutOfStock;
-        let stockDisplay = prize.stock === -1 ? '无限' : prize.stock;
+        let stockDisplay = prize.stock === -1 ? '不限量' : prize.stock;
         let stockClass = isOutOfStock ? 'stock-zero' : '';
 
         const prizeItem = document.createElement('div');
@@ -2542,10 +2626,10 @@ function openRedeemModal(studentId) {
         prizeItem.innerHTML = `
             <div class="redeem-prize-info">
                 <strong>${prize.name}</strong>
-                <div>门槛: <span style="color: #e65100; font-weight: bold;">${prize.cost}</span> | 剩余库存: <span class="${stockClass}">${stockDisplay}</span></div>
+                <div>消耗: <span style="color: #e65100; font-weight: bold;">${prize.cost}</span> | 余量: <span class="${stockClass}">${stockDisplay}</span></div>
             </div>
             <button class="redeem-btn" data-prize-id="${prize.id}" ${canRedeem ? '' : 'disabled'}>
-                ${canAfford ? (isOutOfStock ? '已抢光' : '兑换') : '徽章不足'}
+                ${canAfford ? (isOutOfStock ? '已兑完' : '兑换') : '爱心不足'}
             </button>`;
         if (canRedeem) {
             prizeItem.querySelector('.redeem-btn').addEventListener('click', (e) => {
@@ -2566,9 +2650,14 @@ function handleRedeemClick(prizeId) {
     redeemConfirmText.innerHTML = `
         为 <strong>${student.name}</strong> 兑换
         <strong style="color: #2e7d32; display: block; font-size: 1.3rem; margin: 5px 0;">${prize.name}</strong>
-        将消耗 ${prize.cost} 可用爱心<br>
-        <span style="font-size: 1rem; color: #555;">(总爱心排名不变)</span>`;
-    redeemConfirmModal.classList.add('show');
+        将消耗 <span style="color:#e65100;">${prize.cost}</span> 可用爱心`;
+    wasRedeemModalOpenBeforeConfirm = !!(redeemModalOverlay && redeemModalOverlay.classList.contains("show"));
+    if (redeemModalOverlay) {
+        redeemModalOverlay.classList.remove("show");
+    }
+    if (redeemConfirmModal) {
+        redeemConfirmModal.classList.add("show");
+    }
 }
 
 function confirmRedeem() {
@@ -2576,10 +2665,22 @@ function confirmRedeem() {
     const student = allClassData[currentClassId].students.find(s => s.id === studentId);
     const prize = allClassData[currentClassId].prizes.find(p => p.id === prizeId);
 
-    if (!student || !prize) { alert('发生错误：找不到学生或奖品。'); redeemConfirmModal.classList.remove('show'); return; }
+    if (!student || !prize) {
+        alert('未找到学生或奖品');
+        if (redeemConfirmModal) redeemConfirmModal.classList.remove("show");
+        return;
+    }
     const availableBadges = getStudentAvailableBadges(student);
-    if (availableBadges < prize.cost) { alert('兑换失败：爱心数量不足！'); redeemConfirmModal.classList.remove('show'); return; }
-    if (prize.stock === 0) { alert('兑换失败：该奖品已无库存！'); redeemConfirmModal.classList.remove('show'); return; }
+    if (availableBadges < prize.cost) {
+        alert('兑换失败，可用爱心不足');
+        if (redeemConfirmModal) redeemConfirmModal.classList.remove("show");
+        return;
+    }
+    if (prize.stock === 0) {
+        alert('兑换失败，奖品已兑完');
+        if (redeemConfirmModal) redeemConfirmModal.classList.remove("show");
+        return;
+    }
 
     if (!Array.isArray(student.redeemedHistory)) student.redeemedHistory = [];
     student.redeemedHistory.push({
@@ -2592,15 +2693,15 @@ function confirmRedeem() {
     if (prize.stock > 0) prize.stock--;
 
     saveAllClassData();
-    soundManager.init(); soundManager.playHarvest(); 
+    soundManager.init();
+    soundManager.playHarvest();
 
-    redeemConfirmModal.classList.remove('show');
-    redeemModalOverlay.classList.remove('show');
-    renderShopView(); 
+    if (redeemConfirmModal) redeemConfirmModal.classList.remove("show");
+    redeemModalOverlay.classList.remove("show");
+    wasRedeemModalOpenBeforeConfirm = false;
+    renderShopView();
 }
-
-// ====== 全局清零功能 ======
-function handleResetAll() {
+ function handleResetAll() {
     try {
         // 强制重新加载数据，确保数据最新
         loadAllClassData();
@@ -2638,8 +2739,8 @@ function handleResetAll() {
         currentClass.groups = [];
         currentClass.prizes = [];
 
-        // 保存数据到localStorage
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(allClassData));
+        // 保存数据到服务器缓存
+        saveAllClassData();
 
         // 关闭确认模态框
         resetConfirmModal.classList.remove('show');
