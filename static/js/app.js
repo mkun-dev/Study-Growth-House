@@ -535,6 +535,7 @@ function showConfirmModal(text, onConfirm, isDanger = false) {
 
 // ====== 事件监听 (合并) ======
 function setupEventListeners() {
+    console.log('setupEventListeners running', { confirmRedeemBtn, cancelRedeemBtn });
 
     // 多班级按钮
     backToClassSelectBtn.addEventListener('click', () => showClassMode(true));
@@ -636,7 +637,9 @@ function setupEventListeners() {
             isProcessingClick = false;
         });
     }
-    modalEnterGardenBtn.addEventListener('click', () => { soundManager.init(); soundManager.playClick(); unifiedModal.classList.remove('show'); showGameMode(); });
+    if (modalEnterGardenBtn) {
+        modalEnterGardenBtn.addEventListener('click', () => { soundManager.init(); soundManager.playClick(); unifiedModal.classList.remove('show'); showGameMode(); });
+    }
 
     // 核心功能按钮
     toggleSelectModeBtn.addEventListener('click', toggleSelectMode);
@@ -667,34 +670,84 @@ function setupEventListeners() {
     confirmDeleteGroupBtn.addEventListener('click', confirmDeleteGroup);
     confirmPenaltyGroupBtn.addEventListener('click', confirmGroupPenalty);
     // CSV导入功能已移除，只支持Excel格式导入
+    // �������������ģ̬���¼�������
 
-    // 新增：宠物相关模态框事件监听器
-    continueCurrentPetBtn.addEventListener('click', () => {
-        lv3GraduationModal.classList.remove('show');
-    });
+    if (continueCurrentPetBtn) {
 
-    changePetBtn.addEventListener('click', () => {
-        // 这个事件会在showLv3GraduationAnimation中设置
-    });
+        continueCurrentPetBtn.addEventListener('click', () => {
 
-    penaltyConfirmBtn.addEventListener('click', () => {
-        // 这个事件会在showPenaltyConfirmModal中重新设置
-    });
+            lv3GraduationModal.classList.remove('show');
 
-    // 为惩罚确认模态框的取消按钮添加事件监听器
-    penaltyConfirmModal.querySelector('.cancel-btn').addEventListener('click', () => {
-        penaltyConfirmModal.classList.remove('show');
-        isProcessingClick = false; // 重置点击状态
-    });
+        });
 
-    // 为宠物选择模态框的取消按钮添加事件监听器
-    petSelectionModal.querySelector('.cancel-btn').addEventListener('click', () => {
-        petSelectionModal.classList.remove('show');
-        isProcessingClick = false; // 重置点击状态
-    });
+    }
 
-    // 宠物成长设置事件监听器
-    saveGrowthSettingsBtn.addEventListener('click', handleSaveGrowthSettings);
+
+
+    if (changePetBtn) {
+
+        changePetBtn.addEventListener('click', () => {
+
+            // ����¼�����showLv3GraduationAnimation������
+
+        });
+
+    }
+
+
+
+    if (penaltyConfirmBtn) {
+
+        penaltyConfirmBtn.addEventListener('click', () => {
+
+            // ����¼�����showPenaltyConfirmModal����������
+
+        });
+
+    }
+
+
+
+    // Ϊ�ͷ�ȷ��ģ̬���ȡ����ť�����¼�������
+
+    if (penaltyConfirmModal) {
+
+        penaltyConfirmModal.querySelector('.cancel-btn')?.addEventListener('click', () => {
+
+            penaltyConfirmModal.classList.remove('show');
+
+            isProcessingClick = false; // ���õ��״̬
+
+        });
+
+    }
+
+
+
+    // Ϊ����ѡ��ģ̬���ȡ����ť�����¼�������
+
+    if (petSelectionModal) {
+
+        petSelectionModal.querySelector('.cancel-btn')?.addEventListener('click', () => {
+
+            petSelectionModal.classList.remove('show');
+
+            isProcessingClick = false; // ���õ��״̬
+
+        });
+
+    }
+
+
+
+    // ����ɳ������¼�������
+
+    if (saveGrowthSettingsBtn) {
+
+        saveGrowthSettingsBtn.addEventListener('click', handleSaveGrowthSettings);
+
+    }
+
 
     // 实时验证输入框
     level2ThresholdInput.addEventListener('input', function() {
@@ -721,7 +774,14 @@ function setupEventListeners() {
 
     // 商城管理
     addPrizeBtn.addEventListener('click', handleAddPrize);
-    confirmRedeemBtn.addEventListener('click', confirmRedeem);
+    if (confirmRedeemBtn) {
+        confirmRedeemBtn.addEventListener('click', (event) => {
+            console.log('confirmRedeemBtn click event', event);
+            confirmRedeem();
+        });
+    } else {
+        console.warn('confirmRedeemBtn not found when wiring events');
+    }
 }
 
 function handleClassCardClick(classId) {
@@ -2661,9 +2721,12 @@ function handleRedeemClick(prizeId) {
 }
 
 function confirmRedeem() {
+    console.log('confirmRedeem invoked', currentRedeemInfo);
     const { studentId, prizeId } = currentRedeemInfo;
+    console.log('confirmRedeem checking', { studentId, prizeId, currentClassId });
     const student = allClassData[currentClassId].students.find(s => s.id === studentId);
     const prize = allClassData[currentClassId].prizes.find(p => p.id === prizeId);
+    console.log('confirmRedeem student/prize lookup', { student, prize });
 
     if (!student || !prize) {
         alert('未找到学生或奖品');
