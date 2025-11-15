@@ -28,6 +28,7 @@
         deleteClassBtn: document.getElementById('admin-delete-class'),
         classPasswordInput: document.getElementById('admin-class-password'),
         saveClassPasswordBtn: document.getElementById('admin-save-class-password'),
+        passwordToggleBtn: document.getElementById('admin-class-password-toggle'),
         classNameLabel: document.getElementById('admin-current-class-name'),
         studentInput: document.getElementById('admin-student-input'),
         saveStudentsBtn: document.getElementById('admin-save-students'),
@@ -78,6 +79,9 @@
         refs.addClassBtn.addEventListener('click', handleCreateClass);
         refs.deleteClassBtn.addEventListener('click', handleDeleteClass);
         refs.saveClassPasswordBtn.addEventListener('click', handleSaveClassPassword);
+        if (refs.passwordToggleBtn) {
+            refs.passwordToggleBtn.addEventListener('click', toggleClassPasswordVisibility);
+        }
         refs.saveStudentsBtn.addEventListener('click', addStudentsFromInput);
         refs.enterGardenBtn.addEventListener('click', () => window.location.href = '/');
         refs.createGroupBtn.addEventListener('click', handleCreateGroup);
@@ -248,6 +252,15 @@
         current.password = (refs.classPasswordInput.value || '').trim();
         saveClasses();
         showToast('班级密码已保存');
+    }
+
+    function toggleClassPasswordVisibility() {
+        if (!refs.classPasswordInput || !refs.passwordToggleBtn) return;
+        const shouldShow = refs.classPasswordInput.type === 'password';
+        refs.classPasswordInput.type = shouldShow ? 'text' : 'password';
+        refs.passwordToggleBtn.classList.toggle('active', shouldShow);
+        refs.passwordToggleBtn.setAttribute('aria-pressed', String(shouldShow));
+        refs.passwordToggleBtn.textContent = shouldShow ? '隐藏密码' : '显示密码';
     }
 
 

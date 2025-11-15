@@ -25,7 +25,7 @@ body {
     display: flex;
     flex-wrap: wrap;
     gap: 14px;
-    align-items: flex-end;
+    align-items: flex-start;
     margin-bottom: 18px;
 }
 .admin-class-controls label {
@@ -38,6 +38,16 @@ body {
 .admin-class-create {
     flex: 1;
     min-width: 220px;
+}
+.admin-class-password {
+    flex: 1;
+    min-width: 220px;
+    margin-top: 8px;
+}
+.admin-class-password small {
+    display: block;
+    margin-top: 6px;
+    color: #757575;
 }
 
 @media (max-width: 1024px) {
@@ -56,10 +66,14 @@ body {
     display: flex;
     gap: 8px;
 }
-.admin-class-password {
-    flex: 1;
-    min-width: 220px;
-    margin-top: 12px;
+.admin-class-password .admin-class-create-inline {
+    align-items: center;
+}
+.password-toggle-btn {
+    min-width: 96px;
+    font-size: 0.9rem;
+    padding-left: 12px;
+    padding-right: 12px;
 }
 .admin-class-create-inline input,
 .admin-class-select select {
@@ -68,11 +82,6 @@ body {
     border: 1px solid #e0e0e0;
     border-radius: 8px;
     font-size: 0.95rem;
-}
-.admin-class-password small {
-    display: block;
-    margin-top: 6px;
-    color: #757575;
 }
 #admin-setup-title {
     text-align: center;

@@ -31,15 +31,15 @@
                         <button id="admin-add-class" class="admin-btn admin-primary">创建</button>
                     </div>
                 </div>
-                <button id="admin-delete-class" class="admin-btn admin-ghost">删除班级</button>
-                <div class="admin-class-password">
-                    <label for="admin-class-password">班级密码</label>
-                    <div class="admin-class-create-inline">
-                        <input id="admin-class-password" type="text" placeholder="设置或修改班级密码">
-                        <button id="admin-save-class-password" class="admin-btn admin-secondary">保存密码</button>
-                    </div>
-                    <small style="color:#666;">学生端进入该班级时需要输入此密码。</small>
+            </div>
+            <div class="admin-class-password">
+                <label for="admin-class-password">班级密码</label>
+                <div class="admin-class-create-inline">
+                    <input id="admin-class-password" type="password" placeholder="设置或修改班级密码" autocomplete="new-password">
+                    <button id="admin-class-password-toggle" type="button" class="admin-btn admin-ghost password-toggle-btn" aria-pressed="false">显示密码</button>
+                    <button id="admin-save-class-password" class="admin-btn admin-secondary">保存密码</button>
                 </div>
+                <small style="color:#666;">学生端进入该班级时需要输入此密码</small>
             </div>
 
             <h2 id="admin-setup-title">为班级 “<span id="admin-current-class-name">-</span>” 设置名单</h2>
@@ -103,9 +103,9 @@
                 </div>
             </div>
 
-                <div class="admin-section danger-zone">
-                    <button id="admin-reset-class" type="button" class="admin-btn admin-danger">本班进度归零</button>
-                </div>
+            <div class="admin-section danger-zone">
+                <button id="admin-delete-class" type="button" class="admin-btn admin-danger">删除班级</button>
+            </div>
             </div>
         </div>
 
