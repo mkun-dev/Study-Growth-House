@@ -229,29 +229,42 @@
         </div>
     </div>
 
-    <div id="lv3-graduation-modal" class="modal-overlay">
+            <div id="penalty-confirm-modal" class="modal-overlay">
         <div class="modal-content">
-            <h3>恭喜获得徽章！</h3>
-            <p id="graduation-student-name"></p>
+            <p style="color:#c62828;font-weight:bold;">确认扣分</p>
+            <p>该学生将清空当前爱心并重置宠物，是否继续？</p>
+            <div>
+                <button id="penalty-confirm-btn" style="background-color:#c62828;">确认扣分</button>
+                <button class="cancel-btn">取消</button>
+            </div>
+        </div>
+    </div>
+
+        <div id="lv3-graduation-modal" class="modal-overlay">
+        <div class="modal-content">
+            <h3>恭喜养成 LV3！</h3>
+            <div id="lv3-graduation-message" style="margin-bottom: 12px;"></div>
+            <div id="lv3-graduation-badge" style="margin-bottom: 12px;"></div>
+            <p id="graduation-student-name" style="display:none;"></p>
             <div>
                 <button id="continue-current-pet-btn">继续当前宠物</button>
                 <button id="change-pet-btn">更换宠物</button>
             </div>
         </div>
     </div>
-
-    <div id="pet-selection-modal" class="modal-overlay">
+<div id="pet-selection-modal" class="modal-overlay">
         <div class="modal-content">
-            <h3 style="color:#f57c00;text-align:center;">选择新宠物</h3>
+            <h3 style="color:#f57c00;text-align:center;">选宠物</h3>
+            <p id="pet-selection-message" style="text-align:center; margin-bottom: 12px;"></p>
             <div id="pet-selection-grid"></div>
+            <div id="pet-selection-list" class="pet-selection-grid"></div>
             <div class="modal-actions">
                 <button id="confirm-pet-selection-btn">确认更换</button>
                 <button class="cancel-btn">取消</button>
             </div>
         </div>
     </div>
-
-    <div id="redeem-modal-overlay" class="modal-overlay">
+<div id="redeem-modal-overlay" class="modal-overlay">
         <div class="modal-content" id="redeem-modal-content">
             <div id="redeem-modal-header">
                 <h3 id="redeem-modal-title">兑换奖励</h3>

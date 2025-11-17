@@ -1339,6 +1339,7 @@ function handleRewardAndCheck(studentId) {
         student.petLevel = "lv3";
         student.recitationCount = 0; // 重置为睡觉状态
         student.justEnteredLV3 = true; // 标记刚进入LV3
+        handleLv3Graduation(studentId);
         soundManager.playMagicGrow(); // 升级音效
     }
     // 检查升级 (Lv.2) - 确保不会降级已经是LV3的宠物
