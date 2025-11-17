@@ -17,6 +17,13 @@ if (!window.APP_CONFIG) {
 }
 const API_ROUTES = APP_CONFIG.routes || {};
 
+const createRandomId = () => {
+    if (window.crypto && typeof window.crypto.randomUUID === 'function') {
+        return window.crypto.randomUUID();
+    }
+    return `id_${Date.now()}_${Math.random().toString(16).slice(2)}`;
+};
+
 const cloneData = (data, fallback = {}) => {
     if (data == null) return fallback;
     try {
@@ -877,7 +884,7 @@ function handleSaveStudents() {
     names.forEach(name => {
         if (!currentStudents.some(s => s.name === name)) {
             currentStudents.push({
-                id: crypto.randomUUID(),
+                id: createRandomId(),
                 name: name,
                 groupId: null,
                 // 宠物相关字段
@@ -1384,7 +1391,7 @@ function handleLv3Graduation(studentId) {
         petType: student.currentPet,
         petName: petLibrary[student.currentPet]?.name || '宠物',
         earnedAt: new Date().toISOString(),
-        badgeId: crypto.randomUUID()
+        badgeId: createRandomId()
     };
 
     // 添加到动画徽章收集册
@@ -2398,7 +2405,7 @@ function handleCreateGroup() {
     const name = groupNameInput.value.trim();
     const groups = allClassData[currentClassId].groups; // 使用当前班级数据
     if (!name || groups.some(g => g.name === name)) { alert('小组名不能为空或已存在！'); return; }
-    const newGroup = { id: crypto.randomUUID(), name: name };
+    const newGroup = { id: createRandomId(), name: name };
     groups.push(newGroup);
     saveAllClassData();
     groupNameInput.value = '';
@@ -2546,7 +2553,7 @@ function handleAddPrize() {
     const stock = stockInput === '' ? -1 : parseInt(stockInput);
     if (isNaN(stock) || (stock < 0 && stock !== -1)) { alert('库存请输入一个正整数，或不填代表无限。'); return; }
 
-    const newPrize = { id: crypto.randomUUID(), name: name, cost: cost, stock: stock };
+            const newPrize = { id: createRandomId(), name: name, cost: cost, stock: stock };
     allClassData[currentClassId].prizes.push(newPrize); // 添加到当前班级
     saveAllClassData();
     renderPrizeManagementList();
