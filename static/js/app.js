@@ -2419,6 +2419,8 @@ function handleRecitation(studentId, plantUnit) {
         if (!Array.isArray(student.collectedPlants)) student.collectedPlants = [];
 
         student.collectedPlants.push("❤️");
+        student.progressHearts = (student.progressHearts || 0) + 1;
+        student.progressHearts = (student.progressHearts || 0) + 1;
 
         console.log('添加爱心，新总数:', student.collectedPlants.length);
 
@@ -2672,28 +2674,27 @@ function handleRewardAndCheck(studentId) {
     const student = allClassData[currentClassId].students.find(s => s.id === studentId);
     if (!student) return;
     if (!Array.isArray(student.collectedPlants)) student.collectedPlants = [];
+    student.progressHearts = student.progressHearts || 0;
 
-    const totalCollected = student.collectedPlants.length;
-    const totalSpent = (student.redeemedHistory || []).reduce((sum, item) => sum + item.cost, 0);
-    const availableHearts = Math.max(0, totalCollected - totalSpent);
+    console.log('当前数量:', student.collectedPlants.length, '可用爱心:', student.progressHearts, '当前等级:', student.petLevel, 'LV2门槛:', PET_LEVEL_2_THRESHOLD, 'LV3门槛:', PET_LEVEL_3_THRESHOLD);
 
-    console.log('当前数量:', totalCollected, '可用爱心:', availableHearts, '当前等级:', student.petLevel, 'LV2门槛:', PET_LEVEL_2_THRESHOLD, 'LV3门槛:', PET_LEVEL_3_THRESHOLD);
-
-    if (availableHearts >= PET_LEVEL_3_THRESHOLD && student.petLevel !== "lv3") {
+    if (student.progressHearts >= PET_LEVEL_3_THRESHOLD && student.petLevel !== "lv3") {
         console.log('升级到LV3!');
         student.petLevel = "lv3";
         student.recitationCount = 0;
         student.justEnteredLV3 = true;
+        student.progressHearts = 0;
         handleLv3Graduation(studentId);
         soundManager.playMagicGrow();
         return;
     }
 
-    if (availableHearts >= PET_LEVEL_2_THRESHOLD && student.petLevel === "lv1") {
+    if (student.progressHearts >= PET_LEVEL_2_THRESHOLD && student.petLevel === "lv1") {
         console.log('升级到LV2!');
         student.petLevel = "lv2";
         soundManager.playMagicGrow();
     }
+
 }
 
 function handleLv3CycleComplete(studentId) {
@@ -3022,9 +3023,9 @@ function showLv3GraduationAnimation(studentId, badge, isFirstTime = false) {
         lv3GraduationModal.classList.remove('show');
         const student = allClassData[currentClassId].students.find(s => s.id === studentId);
         if (student) {
+            student.petLevel = 'lv1';
             student.recitationCount = 0;
             student.totalRecitations = 0;
-            student.petLevel = 'lv1';
             student.justEnteredLV3 = false;
             student.justContinuedPet = false;
             saveAllClassData();
@@ -3552,6 +3553,7 @@ function confirmAddScore() {
     for (let i = 0; i < steps; i++) {
 
         student.collectedPlants.push("❤️");
+        student.progressHearts = (student.progressHearts || 0) + 1;
 
     }
 
@@ -4160,6 +4162,7 @@ function handleBatchRecitation() {
             if (!Array.isArray(student.collectedPlants)) student.collectedPlants = [];
 
             student.collectedPlants.push("❤️");
+        student.progressHearts = (student.progressHearts || 0) + 1;
 
 
 
@@ -5503,7 +5506,7 @@ function confirmRedeem() {
 
     });
 
-
+    student.progressHearts = Math.max(0, (student.progressHearts || 0) - prize.cost);
 
     if (prize.stock > 0) prize.stock--;
 
