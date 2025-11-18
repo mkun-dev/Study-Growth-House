@@ -359,11 +359,15 @@ input[type="text"], input[type="number"] { width: 100%; padding: 12px; border: 1
     #groups-display-area,
     #prize-list-display-area,
     .garden-grid,
-    .group-grid,
-    #group-view-container,
     .shop-view-container,
     .student-rank-list {
         max-width: min(1000px, calc(100vw - 120px));
+        margin-left: auto;
+        margin-right: auto;
+    }
+    #group-view-container,
+    .group-grid {
+        max-width: min(1200px, calc(100vw - 120px));
         margin-left: auto;
         margin-right: auto;
     }
